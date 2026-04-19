@@ -3,6 +3,7 @@
 // Ba chế độ: Collaborative (2-hop), Category-based (3-hop), Lịch sử
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { api }         from "../api";
 import ProductGrid     from "./ProductGrid";
 
@@ -30,6 +31,7 @@ function normalizeItem(p) {
 }
 
 export default function RecommendPanel({ userId }) {
+  const navigate = useNavigate();
   const [mode,    setMode]    = useState("collaborative");
   const [data,    setData]    = useState(null);
   const [similar, setSimilar] = useState([]);
@@ -142,7 +144,10 @@ export default function RecommendPanel({ userId }) {
               </span>
             )}
           </div>
-          <ProductGrid products={items} />
+          <ProductGrid
+            products={items}
+            onViewDetail={(product) => navigate(`/product/${product.product_id}`)}
+          />
         </>
       )}
     </div>

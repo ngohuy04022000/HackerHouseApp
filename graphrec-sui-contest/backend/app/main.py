@@ -3,14 +3,41 @@ from contextlib import asynccontextmanager
 
 import aiomysql
 from fastapi import FastAPI, Query
+from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 from app.db.neo4j_client   import neo4j_driver
 from app.db.mysql_client    import mysql_pool
 from app.db.elastic_client  import es_client, PRODUCTS_INDEX
 
-from app.routers import search, recommend, compare, benchmark, etl
+from app.routers import search, recommend, etl
 from app.routers import sui
+
+
+REVIEW_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS product_reviews (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    product_id  VARCHAR(20)  NOT NULL,
+    user_id     VARCHAR(20)  DEFAULT NULL,
+    user_name   VARCHAR(200) NOT NULL,
+    wallet_address VARCHAR(200) DEFAULT NULL,
+    rating      TINYINT      NOT NULL,
+    comment     TEXT         DEFAULT NULL,
+    created_at  DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_pr_product_created (product_id, created_at),
+    INDEX idx_pr_rating (rating),
+    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
+)
+"""
+
+
+class ProductReviewCreate(BaseModel):
+    user_id: str = ""
+    user_name: str = "Guest"
+    wallet_address: str = ""
+    rating: int = Field(..., ge=1, le=5)
+    comment: str = ""
 
 
 # ── Lifespan: khoi dong va tat server ────────────────────────────────────────
@@ -52,7 +79,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="GraphRec API",
-    description="So sanh Neo4j (Graph DB) vs MySQL (Relational DB) cho he thong de xuat san pham",
+    description="Nen tang thuong mai dien tu ket hop de xuat san pham va phan thuong blockchain SUI",
     version="2.0.0",
     lifespan=lifespan,
 )
@@ -69,8 +96,6 @@ app.add_middleware(
 
 app.include_router(search.router,    prefix="/search",    tags=["Search"])
 app.include_router(recommend.router, prefix="/recommend", tags=["Recommend"])
-app.include_router(compare.router,   prefix="/compare",   tags=["Compare"])
-app.include_router(benchmark.router, prefix="/benchmark", tags=["Benchmark"])
 app.include_router(etl.router,       prefix="/etl",       tags=["ETL"])
 app.include_router(sui.router,       prefix="/sui", tags=["Sui Blockchain"])
 
@@ -86,8 +111,9 @@ async def root():
             "search":    "GET  /search?q=LG&engine=auto",
             "recommend": "GET  /recommend/{user_id}",
             "category":  "GET  /recommend/category/{user_id}",
-            "compare":   "POST /compare/query",
-            "benchmark": "GET  /benchmark/run?iterations=10",
+            "wallet":    "GET  /sui/wallet/{address}",
+            "reward":    "POST /sui/reward",
+            "mint_nft":  "POST /sui/mint-nft",
             "etl":       "POST /etl/upload",
         },
     }
@@ -178,7 +204,6 @@ async def list_products(
 
 @app.get("/products/{product_id}", tags=["Products"])
 async def get_product(product_id: str):
-    from fastapi import HTTPException
     pool = await mysql_pool()
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
@@ -187,6 +212,186 @@ async def get_product(product_id: str):
     if not row:
         raise HTTPException(404, "Product not found")
     return dict(row)
+
+
+@app.get("/products/{product_id}/detail", tags=["Products"])
+async def get_product_detail(product_id: str):
+    pool = await mysql_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(REVIEW_TABLE_SQL)
+
+            await cur.execute("SELECT * FROM products WHERE product_id = %s", (product_id,))
+            product = await cur.fetchone()
+            if not product:
+                raise HTTPException(404, "Product not found")
+
+            await cur.execute(
+                """
+                SELECT id, product_id, user_id, user_name, wallet_address, rating, comment, created_at
+                FROM product_reviews
+                WHERE product_id = %s
+                ORDER BY created_at DESC
+                LIMIT 20
+                """,
+                (product_id,),
+            )
+            reviews = await cur.fetchall()
+
+            await cur.execute(
+                """
+                SELECT AVG(rating) AS avg_rating, COUNT(*) AS total_reviews
+                FROM product_reviews
+                WHERE product_id = %s
+                """,
+                (product_id,),
+            )
+            summary = await cur.fetchone()
+
+            await cur.execute(
+                """
+                SELECT product_id, title, brand, sub_category, price, original_price, rating, review_count, image_url
+                FROM products
+                WHERE sub_category = %s AND product_id != %s
+                ORDER BY rating DESC, review_count DESC
+                LIMIT 8
+                """,
+                (product.get("sub_category", ""), product_id),
+            )
+            related = await cur.fetchall()
+
+    return {
+        "product": dict(product),
+        "reviews": list(reviews),
+        "review_summary": {
+            "avg_rating": round(float(summary.get("avg_rating") or 0), 2),
+            "total_reviews": int(summary.get("total_reviews") or 0),
+        },
+        "related_products": list(related),
+    }
+
+
+@app.post("/products/{product_id}/reviews", tags=["Products"])
+async def add_product_review(product_id: str, payload: ProductReviewCreate):
+    pool = await mysql_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(REVIEW_TABLE_SQL)
+            await cur.execute("SELECT product_id FROM products WHERE product_id = %s", (product_id,))
+            exists = await cur.fetchone()
+            if not exists:
+                raise HTTPException(404, "Product not found")
+
+            user_name = (payload.user_name or "Guest").strip()[:200] or "Guest"
+            comment = (payload.comment or "").strip()[:2000]
+            wallet_address = (payload.wallet_address or "").strip()[:200]
+            user_id = (payload.user_id or "").strip()[:20]
+
+            # Anti-spam: chan review lien tiep trong thoi gian ngan cho cung actor + san pham.
+            actor_where = ""
+            actor_params: list[str] = []
+            if user_id:
+                actor_where = "user_id = %s"
+                actor_params.append(user_id)
+            elif wallet_address:
+                actor_where = "wallet_address = %s"
+                actor_params.append(wallet_address)
+            else:
+                actor_where = "user_name = %s"
+                actor_params.append(user_name)
+
+            await cur.execute(
+                f"""
+                SELECT id, rating, comment,
+                       TIMESTAMPDIFF(SECOND, created_at, NOW()) AS diff_sec
+                FROM product_reviews
+                WHERE product_id = %s AND ({actor_where})
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                [product_id, *actor_params],
+            )
+            last_review = await cur.fetchone()
+
+            if last_review and int(last_review.get("diff_sec") or 0) < 90:
+                raise HTTPException(
+                    429,
+                    "Bạn vừa đánh giá sản phẩm này. Vui lòng chờ một lúc rồi thử lại.",
+                )
+
+            if (
+                last_review
+                and int(last_review.get("diff_sec") or 0) < 600
+                and int(last_review.get("rating") or 0) == int(payload.rating)
+                and (last_review.get("comment") or "").strip() == comment
+            ):
+                raise HTTPException(
+                    429,
+                    "Đánh giá trùng lặp trong thời gian ngắn đã bị chặn để tránh spam.",
+                )
+
+            await cur.execute(
+                """
+                INSERT INTO product_reviews (product_id, user_id, user_name, wallet_address, rating, comment)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (product_id, user_id or None, user_name, wallet_address or None, payload.rating, comment),
+            )
+            review_id = cur.lastrowid
+
+            await conn.commit()
+
+            await cur.execute(
+                """
+                SELECT AVG(rating) AS avg_rating, COUNT(*) AS total_reviews
+                FROM product_reviews
+                WHERE product_id = %s
+                """,
+                (product_id,),
+            )
+            summary = await cur.fetchone()
+
+    return {
+        "success": True,
+        "review_id": review_id,
+        "product_id": product_id,
+        "rating": payload.rating,
+        "review_summary": {
+            "avg_rating": round(float(summary.get("avg_rating") or 0), 2),
+            "total_reviews": int(summary.get("total_reviews") or 0),
+        },
+        "message": "Danh gia da duoc ghi nhan",
+    }
+
+
+@app.get("/users/{user_id}/reviews", tags=["Users"])
+async def user_review_history(user_id: str, size: int = Query(20, ge=1, le=100)):
+    pool = await mysql_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(REVIEW_TABLE_SQL)
+            await cur.execute(
+                """
+                SELECT
+                    pr.id,
+                    pr.product_id,
+                    p.title,
+                    p.brand,
+                    p.image_url,
+                    pr.rating,
+                    pr.comment,
+                    pr.created_at
+                FROM product_reviews pr
+                JOIN products p ON p.product_id = pr.product_id
+                WHERE pr.user_id = %s
+                ORDER BY pr.created_at DESC
+                LIMIT %s
+                """,
+                (user_id, size),
+            )
+            rows = await cur.fetchall()
+
+    return {"user_id": user_id, "total": len(rows), "items": list(rows)}
 
 
 # ── Categories ────────────────────────────────────────────────────────────────

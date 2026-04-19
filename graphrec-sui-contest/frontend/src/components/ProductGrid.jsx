@@ -12,7 +12,7 @@ function Stars({ rating }) {
   );
 }
 
-function ProductCard({ product }) {
+function ProductCard({ product, onSelect, onViewDetail, selected }) {
   // _highlight la doan HTML co <em> tu Elasticsearch highlight
   const title = product._highlight?.[0] || product.title || "(Khong co ten)";
   const img   = product.image_url;
@@ -24,7 +24,11 @@ function ProductCard({ product }) {
     ? Math.round((1 - price / orig) * 100) : 0;
 
   return (
-    <div className="product-card">
+    <div
+      className="product-card"
+      onClick={() => onSelect?.(product)}
+      style={selected ? { border: "1px solid var(--acc)" } : undefined}
+    >
       {/* Anh san pham */}
       <div className="product-img-wrap">
         {img
@@ -64,12 +68,23 @@ function ProductCard({ product }) {
         {product.score != null && (
           <span className="score-badge">score: {product.score}</span>
         )}
+
+        <button
+          className="btn-secondary"
+          style={{ marginTop: 8, width: "100%" }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewDetail?.(product);
+          }}
+        >
+          Xem chi tiết
+        </button>
       </div>
     </div>
   );
 }
 
-export default function ProductGrid({ products }) {
+export default function ProductGrid({ products, onSelect, onViewDetail, selectedProductId }) {
   if (!products || products.length === 0) {
     return (
       <div className="empty-state">
@@ -80,7 +95,13 @@ export default function ProductGrid({ products }) {
   return (
     <div className="product-grid">
       {products.map((p, i) => (
-        <ProductCard key={p.product_id || i} product={p} />
+        <ProductCard
+          key={p.product_id || i}
+          product={p}
+          onSelect={onSelect}
+          onViewDetail={onViewDetail}
+          selected={selectedProductId && selectedProductId === p.product_id}
+        />
       ))}
     </div>
   );

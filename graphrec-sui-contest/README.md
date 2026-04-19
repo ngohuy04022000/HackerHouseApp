@@ -1,11 +1,11 @@
 # GraphRec SUI Contest Project
 
-This folder is the contest submission version of GraphRec. It keeps the SUI wallet, reward, Product NFT, and on-chain recommendation flows together with the search/recommendation stack.
+This folder is the contest submission version of GraphRec. It focuses on an ecommerce experience with SUI wallet reward, Product NFT, and on-chain recommendation score flows.
 
 ## What is included
 
-- FastAPI backend for search, recommendation, compare, benchmark, ETL, and SUI APIs.
-- React frontend with the SUI wallet and reward panel.
+- FastAPI backend for product search, recommendation, ETL, and SUI APIs.
+- React frontend as an ecommerce storefront with recommendation and reward actions.
 - Neo4j, MySQL, Elasticsearch, and SUI integration.
 - Move smart contract and deployment scripts.
 

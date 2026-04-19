@@ -47,3 +47,20 @@ CREATE TABLE IF NOT EXISTS actions (
     FOREIGN KEY (user_id)    REFERENCES users(user_id)    ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
 );
+
+-- Bảng đánh giá sản phẩm do người dùng gửi trong luồng ecommerce
+CREATE TABLE IF NOT EXISTS product_reviews (
+    id             BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    product_id     VARCHAR(20)  NOT NULL,
+    user_id        VARCHAR(20)  NULL,
+    user_name      VARCHAR(200) NOT NULL,
+    wallet_address VARCHAR(200) NULL,
+    rating         TINYINT      NOT NULL,
+    comment        TEXT,
+    created_at     DATETIME     DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_pr_product_created (product_id, created_at),
+    INDEX idx_pr_rating (rating),
+    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
+);

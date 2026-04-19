@@ -119,32 +119,3 @@ async def search(
     except (NotFoundError, Exception):
         return await _mysql_search(q, category, size)
 
-
-@router.get("/explain")
-async def explain_search(q: str = Query(..., min_length=1)):
-    """So sánh cấu trúc câu truy vấn của ES và MySQL cho cùng từ khóa."""
-    return {
-        "term": q,
-        "elasticsearch": {
-            "query": {
-                "multi_match": {
-                    "query": q, "fields": ["title^3", "brand^2", "sub_category"],
-                    "type": "best_fields", "fuzziness": "AUTO",
-                }
-            },
-            "advantages": ["fuzzy matching", "multi-field scoring BM25",
-                           "highlight", "aggregation", "relevance ranking"],
-        },
-        "mysql": {
-            "query": f"SELECT * FROM products WHERE MATCH(title) AGAINST('{q}' IN BOOLEAN MODE)",
-            "advantages": ["no extra service", "ACID", "simple SQL"],
-            "limitations": ["no fuzzy", "basic scoring", "no highlight"],
-        },
-        "comparison": {
-            "fuzzy_matching":    {"elasticsearch": True,          "mysql": False},
-            "relevance_scoring": {"elasticsearch": "BM25",        "mysql": "basic TF-IDF"},
-            "highlight":         {"elasticsearch": True,          "mysql": False},
-            "aggregations":      {"elasticsearch": True,          "mysql": "GROUP BY only"},
-            "latency_typical":   {"elasticsearch": "5-20ms",      "mysql": "10-50ms"},
-        },
-    }
