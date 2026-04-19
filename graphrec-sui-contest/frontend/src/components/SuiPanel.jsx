@@ -565,18 +565,6 @@ export default function SuiPanel({ userId }) {
             </button>
           </div>
         )}
-
-        {/* Tip: dApp Kit */}
-        <div style={{
-          marginTop: 10, padding: "8px 12px", background: "var(--info-bg)",
-          borderRadius: 7, fontSize: ".78rem", color: "var(--info)", lineHeight: 1.5,
-        }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Info size={14} /> <strong>Production:</strong></span> cài{" "}
-          <code style={{ background: "rgba(0,0,0,.2)", padding: "1px 5px", borderRadius: 4 }}>
-            @mysten/dapp-kit
-          </code>{" "}
-          để dùng SUI Wallet / Slush Wallet extension thay vì nhập thủ công.
-        </div>
       </div>
 
       {/* Section nav */}

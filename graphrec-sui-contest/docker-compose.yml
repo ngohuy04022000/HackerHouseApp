@@ -6,7 +6,7 @@ services:
       - "7474:7474"
       - "7687:7687"
     environment:
-      NEO4J_AUTH: neo4j/graphrec123
+      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/graphrec123}
       NEO4J_server_memory_heap_initial__size: 512m
       NEO4J_server_memory_heap_max__size: 1G
     volumes:
@@ -24,8 +24,8 @@ services:
     ports:
       - "3306:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: graphrec123
-      MYSQL_DATABASE: graphrec_db
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-graphrec123}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-graphrec_db}
     volumes:
       - mysql_data:/var/lib/mysql
       - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -60,24 +60,23 @@ services:
     ports:
       - "8000:8000"
     environment:
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: neo4j
-      NEO4J_PASSWORD: graphrec123
-      MYSQL_HOST: mysql
-      MYSQL_USER: root
-      MYSQL_PASSWORD: graphrec123
-      MYSQL_DB: graphrec_db
-      ES_HOST: http://elasticsearch:9200
-      # ── Sui Blockchain ────────────────────────────────────────────
-      SUI_NETWORK: testnet
-      SUI_PRIVATE_KEY: "AJezwZpdkKoqMFonE/o6gYag64GO+ZUbNGSXeVGkjLQ+"
-      SUI_ADMIN_ADDRESS: "0xd644df0c8b70f758e6b14e0b51bf13855a2b2fafa5b7ea3804bb662bb3710c5e"    
-      SUI_PACKAGE_ID: "0xa388013751d3e3aada7864735d699549fa16d170742802afda4ef8dc7ad9cd4a"
-      SUI_POOL_ID: "0xb9bf726d557dd6e31934b78a8d912ddca718827016703a06472793df28de0a4a"
-      SUI_REGISTRY_ID: "0xeed342ae5576519f51a9a2ffcbb8de690fec18bf30c8e713dd8b06b67f414618"
-      SUI_ADMIN_CAP_ID: "0xe378e24ae737cfe758f5ca66f4b50d58dabdbca157acdb0375d9f6a2ec79a767"
-      SUI_TREASURY_ID: "0x72c1a06e8cca9994f6a067d7fa72ff061eae9b1edbe121e3f79d33e13f619709"
-      SUI_PROFILE_ID: "${SUI_PROFILE_ID:-}"
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-graphrec123}
+      MYSQL_HOST: ${MYSQL_HOST:-mysql}
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-graphrec123}
+      MYSQL_DB: ${MYSQL_DB:-graphrec_db}
+      ES_HOST: ${ES_HOST:-http://elasticsearch:9200}
+      SUI_NETWORK: ${SUI_NETWORK:-testnet}
+      SUI_PRIVATE_KEY: ${SUI_PRIVATE_KEY:-}
+      SUI_ADMIN_ADDRESS: ${SUI_ADMIN_ADDRESS:-}
+      SUI_PACKAGE_ID: ${SUI_PACKAGE_ID:-}
+      SUI_POOL_ID: ${SUI_POOL_ID:-}
+      SUI_REGISTRY_ID: ${SUI_REGISTRY_ID:-}
+      SUI_ADMIN_CAP_ID: ${SUI_ADMIN_CAP_ID:-}
+      SUI_TREASURY_ID: ${SUI_TREASURY_ID:-}
+      SUI_PROFILE_ID: ${SUI_PROFILE_ID:-}
     volumes:
       - ./data:/app/data
     depends_on:
