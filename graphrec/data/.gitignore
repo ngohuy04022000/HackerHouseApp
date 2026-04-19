@@ -1,0 +1,9 @@
+# Generated or temporary data files
+*.tmp
+*.temp
+*.bak
+*.log
+
+# Processed exports
+processed/
+exports/

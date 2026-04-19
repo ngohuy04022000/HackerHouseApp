@@ -1,0 +1,6 @@
+# Move build artifacts
+build/
+
+# Local package/cache files
+Move.lock
+.sui/

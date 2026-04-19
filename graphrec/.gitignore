@@ -1,0 +1,22 @@
+# Global ignores
+.env
+.env.*
+*.key
+*.pem
+*.log
+*.tmp
+*.swp
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Test reports
+coverage.xml
+*.coverage
+
+# Temporary scripts and outputs
+run_*.ps1
+smoke_*.json

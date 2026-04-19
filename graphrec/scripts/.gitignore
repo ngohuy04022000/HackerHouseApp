@@ -1,0 +1,4 @@
+# Script output logs
+*.log
+*.out
+*.tmp

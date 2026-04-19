@@ -1,0 +1,8 @@
+# Documentation build output
+site/
+.build/
+.cache/
+
+# Temporary files
+*.tmp
+*.log
